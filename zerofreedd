@@ -1,0 +1,45 @@
+#!/bin/bash
+
+_ME=$(basename "$0")
+
+function usage {
+	echo ""
+	echo "Usage: $0 <mount-point>"
+	echo ""
+}
+
+function df_m {
+	local FS=$1
+	df -m "$FS" | tail -1 | awk '{print $4}'
+}
+
+function main {
+	local FS=$1
+
+	if [ -z "$FS" ]; then
+		usage
+		exit 1
+	fi
+
+	local FILE=$(TMPDIR="$FS" mktemp "$_ME.XXXXXX")
+	if [ $? -ne 0 ]; then
+		echo "Error creating temporary file in '$FS'."
+		exit 2
+	fi
+	FILE="$FS/$FILE"
+
+	# Fill up ( free space - 1MB )
+	local FREE=$(df_m "$FS")
+	local COUNT=$(($FREE-1))
+	echo "Zeroing ${COUNT}MB in '$FILE'..."
+	dd if=/dev/zero of="$FILE" bs=1M count=$COUNT
+	if [ $? -ne 0 ]; then
+		echo "Error zeroing ${COUNT}MB in '$FS'."
+		rm "$FILE"
+		exit 3
+	fi
+	rm "$FILE"
+	echo "Done."
+}
+
+main "$@"
